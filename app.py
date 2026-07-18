@@ -21,7 +21,7 @@ COL_LABELS = {
     "result": "결과", "remark": "Remark",
 }
 
-PAGES = ["대시보드", "신규 모델 등록", "모델 상세", "제품군 비교표", "템플릿 관리", "변경 이력"]
+PAGES = ["대시보드", "신규 모델 등록", "모델 상세", "제품군 비교표", "통계 리포트", "템플릿 관리", "변경 이력"]
 
 # 템플릿 관리 표 컬럼 (모델 편집표와 달리 판정채널·수행가능 컬럼 사용)
 TPL_FIELDS = ["seq", "category", "item_name", "code", "spec", "criteria",
@@ -273,6 +273,65 @@ def changelog_view():
     st.dataframe(df, use_container_width=True, hide_index=True)
 
 
+# ---------------- 통계 리포트 ----------------
+def stats_view():
+    st.header("📈 통계 리포트")
+    st.caption("적용(Y) 항목 기준 · 진행상태 '해당없음' 제외")
+    models = db.list_models()
+    if not models:
+        st.info("등록된 모델이 없습니다.")
+        return
+
+    summary, ng_rows = [], []
+    for m in models:
+        items = db.get_model_items(m["id"])
+        active = [it for it in items
+                  if (it.get("applicable") or "Y") == "Y"
+                  and it.get("progress") != "해당없음"]
+        done = sum(1 for it in active if it.get("progress") == "완료")
+        ng_items = [it for it in active if it.get("result") == "NG"]
+        summary.append({
+            "model": m, "total": len(active), "done": done,
+            "run": sum(1 for it in active if it.get("progress") == "진행"),
+            "hold": sum(1 for it in active if it.get("progress") == "보류"),
+            "ok": sum(1 for it in active if it.get("result") == "OK"),
+            "ng": len(ng_items),
+        })
+        for it in ng_items:
+            ng_rows.append({"모델": m["name"], "시험항목": it.get("item_name"),
+                            "State": it.get("stage"), "조건": it.get("spec"),
+                            "진행상태": it.get("progress"), "Remark": it.get("remark")})
+
+    total = sum(s["total"] for s in summary)
+    done_all = sum(s["done"] for s in summary)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("모델 수", len(models))
+    c2.metric("시험항목 (적용)", total)
+    c3.metric("완료율", f"{done_all / total * 100:.0f}%" if total else "-")
+    c4.metric("NG 건수", len(ng_rows))
+
+    st.markdown("#### 모델별 진행률")
+    for s in summary:
+        m = s["model"]
+        ratio = s["done"] / s["total"] if s["total"] else 0.0
+        st.progress(ratio, text=f"{m['name']} ({m['product_group']} · {m['dev_stage']}) — "
+                                f"완료 {s['done']}/{s['total']} ({ratio * 100:.0f}%)")
+
+    st.markdown("#### 모델별 현황")
+    df = pd.DataFrame([{
+        "모델": s["model"]["name"], "제품군": s["model"]["product_group"],
+        "단계": s["model"]["dev_stage"], "적용 항목": s["total"], "완료": s["done"],
+        "진행": s["run"], "보류": s["hold"], "OK": s["ok"], "NG": s["ng"],
+    } for s in summary])
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    st.markdown("#### ❗ NG 현황")
+    if ng_rows:
+        st.dataframe(pd.DataFrame(ng_rows), use_container_width=True, hide_index=True)
+    else:
+        st.success("NG 판정 항목이 없습니다.")
+
+
 # ---------------- 라우팅 ----------------
 def main():
     if "user" not in st.session_state:
@@ -303,6 +362,8 @@ def main():
         model_detail_view()
     elif page == "제품군 비교표":
         compare_view()
+    elif page == "통계 리포트":
+        stats_view()
     elif page == "템플릿 관리":
         template_manage_view()
     elif page == "변경 이력":
