@@ -2,6 +2,9 @@
 
 IT부서 관리 Windows 서버에 상시 구동으로 배포하는 절차입니다.
 
+서버 없이 개인 PC에서 사용할 때의 실행·종료·백업 스크립트와 설치 구성은
+[windows/README.md](windows/README.md)를 참고하세요.
+
 ## 1. 사전 요구사항
 
 - Windows 서버 (사내망), Python 3.12 설치 (검증 기준)
