@@ -71,16 +71,18 @@ def login_view():
     with st.form("login"):
         st.subheader("로그인")
         users = db.list_users()
-        names = [u["name"] for u in users]
-        pick = st.selectbox("기존 사용자 선택", ["＋ 새 사용자"] + names)
+        users_by_id = {u["id"]: u for u in users}
+        labels = {u["id"]: f"{u['name']} [{u['login_id']}]" for u in users}
+        pick = st.selectbox("기존 사용자 선택", [None] + list(users_by_id),
+                            format_func=lambda uid: "＋ 새 사용자" if uid is None else labels[uid])
         new_name = st.text_input("새 사용자 이름 (신규일 때만 입력)")
         ok = st.form_submit_button("로그인", type="primary")
     if ok:
-        name = new_name.strip() if pick == "＋ 새 사용자" else pick
+        name = new_name.strip() if pick is None else users_by_id[pick]["name"]
         if not name:
             st.error("이름을 선택하거나 입력해 주세요.")
             return
-        st.session_state.user = db.get_or_create_user(name)
+        st.session_state.user = db.get_or_create_user(name) if pick is None else users_by_id[pick]
         st.session_state.page = "대시보드"
         st.rerun()
 
