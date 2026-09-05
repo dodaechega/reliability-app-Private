@@ -1,8 +1,9 @@
 # 모델별 시험표준을 기존 양식과 유사한 엑셀(.xlsx)로 내보내는 유틸
 
 import io
+
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 HEADER_FILL = PatternFill("solid", fgColor="165ABC")
 TITLE_FILL = PatternFill("solid", fgColor="E7E7E7")
@@ -64,6 +65,8 @@ def build_model_xlsx(model, items):
         for j, f in enumerate(FIELDS, start=1):
             val = it.get(f, "")
             cell = ws.cell(r, j, val if val is not None else "")
+            if isinstance(val, str):
+                cell.data_type = "s"  # 입력 문자열을 엑셀 수식으로 실행하지 않는다.
             cell.border = BORDER
             cell.alignment = CENTER if f in ("seq", "stage", "code", "qty", "days", "applicable", "progress", "result") else WRAP
         # 적용=N 이면 회색조 강조

@@ -1,16 +1,39 @@
 # 신뢰성 시험표준 관리 웹앱 — 로그인 · 대시보드 · 신규모델 등록 · 시험항목 편집 · 엑셀 내보내기 메인
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 import db
-from seed_data import PRODUCT_GROUPS, DEV_STAGES, ITEM_STAGES, PROGRESS_STATES, RESULTS
-from export_excel import build_model_xlsx
 from compare import build_matrix, render_html
+from export_excel import build_model_xlsx
+from seed_data import DEV_STAGES, ITEM_STAGES, PRODUCT_GROUPS, PROGRESS_STATES, RESULTS
 
 st.set_page_config(page_title="신뢰성 시험표준 관리", page_icon="🧪",
                    layout="wide", initial_sidebar_state="expanded")
-db.init_db()
+
+
+@st.cache_resource(max_entries=1)
+def initialize_database(path):
+    # 경로를 캐시 키에 포함해 테스트/별도 데이터베이스 초기화를 분리한다.
+    db.init_db()
+
+
+initialize_database(db.DB_PATH)
+
+
+@st.cache_data(max_entries=32, show_spinner=False)
+def cached_model_xlsx(model, items):
+    return build_model_xlsx(model, items)
+
+
+def clean_editor_records(edited, labels, fields):
+    """빈 셀을 None으로 통일하고 이름이 없는 새 행을 제외한다."""
+    frame = edited.rename(columns={v: k for k, v in labels.items()})
+    frame = frame.astype(object).where(pd.notna(frame), None)
+    return [{f: row.get(f) for f in fields}
+            for row in frame.to_dict("records")
+            if str(row.get("item_name") or "").strip()]
+
 
 FIELDS = ["seq", "category", "item_name", "stage", "code", "spec", "criteria",
           "qty", "days", "applicable", "progress", "result", "remark"]
@@ -75,7 +98,7 @@ def dashboard_view():
     ]
     df.columns = ["ID", "모델명", "코드", "제품군", "단계", "담당자",
                   "시작", "완료예정", "상태", "등록자", "등록일시"]
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
     st.divider()
     labels = {m["id"]: f"[{m['id']}] {m['name']} ({m['product_group']})" for m in models}
@@ -89,12 +112,12 @@ def dashboard_view():
 def new_model_view():
     st.header("🆕 신규 모델 등록")
     st.caption("제품군을 선택하면 해당 표준 템플릿이 자동으로 복사됩니다.")
+    product_group = st.selectbox("제품군 *", PRODUCT_GROUPS)
     with st.form("new_model"):
         c1, c2 = st.columns(2)
         with c1:
             name = st.text_input("모델명 *", placeholder="예: Y26 Smart TM2660")
             code = st.text_input("모델 코드")
-            product_group = st.selectbox("제품군 *", PRODUCT_GROUPS)
         with c2:
             dev_stage = st.selectbox("개발 단계", DEV_STAGES)
             owner = st.text_input("담당자", value=st.session_state.user["name"])
@@ -157,7 +180,7 @@ def model_detail_view():
     st.markdown("#### 시험항목 (셀을 직접 편집 · 행 추가/삭제 가능)")
     edited = st.data_editor(
         df,
-        use_container_width=True,
+        width="stretch",
         num_rows="dynamic",
         hide_index=True,
         column_config={
@@ -175,20 +198,15 @@ def model_detail_view():
 
     c1, c2, c3 = st.columns([1, 1, 4])
     if c1.button("💾 저장", type="primary"):
-        inv = {v: k for k, v in COL_LABELS.items()}
-        records = edited.rename(columns=inv).to_dict("records")
-        cleaned = []
-        for rec in records:
-            if not (str(rec.get("item_name") or "").strip()):
-                continue  # 빈 항목 스킵
-            cleaned.append({f: rec.get(f) for f in FIELDS})
+        cleaned = clean_editor_records(edited, COL_LABELS, FIELDS)
         db.replace_model_items(mid, cleaned, st.session_state.user["name"])
         st.success(f"{len(cleaned)}건 저장했습니다.")
         st.rerun()
 
-    xlsx = build_model_xlsx(model, db.get_model_items(mid))
+    xlsx = cached_model_xlsx(model, items)
     c2.download_button("⬇ 엑셀 내보내기", data=xlsx,
                        file_name=f"{model['name']}_Reliability_Test.xlsx",
+                       on_click="ignore", help="마지막으로 저장한 시험항목을 내보냅니다.",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     with st.expander("⚠ 모델 삭제"):
@@ -220,7 +238,7 @@ def compare_view():
     # Streamlit 테마(라이트/다크)에 맞춰 팔레트 선택 — 글자색까지 명시해 가독성 보장
     try:
         dark = st.context.theme.type == "dark"
-    except Exception:
+    except AttributeError:
         dark = False
     st.markdown(render_html(rows, groups, dark=dark), unsafe_allow_html=True)
 
@@ -237,7 +255,7 @@ def template_manage_view():
 
     edited = st.data_editor(
         df,
-        use_container_width=True,
+        width="stretch",
         num_rows="dynamic",
         hide_index=True,
         column_config={
@@ -249,13 +267,7 @@ def template_manage_view():
     )
 
     if st.button("💾 템플릿 저장", type="primary"):
-        inv = {v: k for k, v in TPL_LABELS.items()}
-        records = edited.rename(columns=inv).to_dict("records")
-        cleaned = [
-            {f: rec.get(f) for f in TPL_FIELDS}
-            for rec in records
-            if str(rec.get("item_name") or "").strip()
-        ]
+        cleaned = clean_editor_records(edited, TPL_LABELS, TPL_FIELDS)
         db.replace_template_items(pg, cleaned, st.session_state.user["name"])
         st.success(f"'{pg}' 템플릿 {len(cleaned)}건을 저장했습니다.")
         st.rerun()
@@ -270,7 +282,7 @@ def changelog_view():
         return
     df = pd.DataFrame(logs)[["ts", "user_name", "entity", "entity_id", "action", "detail"]]
     df.columns = ["일시", "사용자", "대상", "대상ID", "동작", "상세"]
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
 
 # ---------------- 통계 리포트 ----------------
@@ -282,9 +294,10 @@ def stats_view():
         st.info("등록된 모델이 없습니다.")
         return
 
+    items_by_model = db.get_items_by_model()
     summary, ng_rows = [], []
     for m in models:
-        items = db.get_model_items(m["id"])
+        items = items_by_model.get(m["id"], [])
         active = [it for it in items
                   if (it.get("applicable") or "Y") == "Y"
                   and it.get("progress") != "해당없음"]
@@ -323,11 +336,11 @@ def stats_view():
         "단계": s["model"]["dev_stage"], "적용 항목": s["total"], "완료": s["done"],
         "진행": s["run"], "보류": s["hold"], "OK": s["ok"], "NG": s["ng"],
     } for s in summary])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
     st.markdown("#### ❗ NG 현황")
     if ng_rows:
-        st.dataframe(pd.DataFrame(ng_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(ng_rows), width="stretch", hide_index=True)
     else:
         st.success("NG 판정 항목이 없습니다.")
 
@@ -350,7 +363,7 @@ def main():
         page = st.radio("메뉴", PAGES, key="page")
         st.divider()
         if st.button("로그아웃"):
-            for k in ("user", "page", "selected_model"):
+            for k in list(st.session_state):
                 st.session_state.pop(k, None)
             st.rerun()
 

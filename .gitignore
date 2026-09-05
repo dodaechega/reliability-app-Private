@@ -2,6 +2,8 @@
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
 
 # 업무 데이터 (DB는 저장소 제외 — 백업은 파일 복사로)
 data/

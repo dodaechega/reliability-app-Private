@@ -4,7 +4,7 @@ IT부서 관리 Windows 서버에 상시 구동으로 배포하는 절차입니�
 
 ## 1. 사전 요구사항
 
-- Windows 서버 (사내망), Python 3.11+ 설치
+- Windows 서버 (사내망), Python 3.12 설치 (검증 기준)
 - Git 설치 (또는 소스 zip 복사)
 - 포트 1개 개방 (기본 8501, 사내망 한정)
 
@@ -62,8 +62,8 @@ New-NetFirewallRule -DisplayName "ReliabilityApp 8501" -Direction Inbound `
 
 ## 6. 백업
 
-- 데이터는 `data\reliability.db` 파일 하나입니다. **이 파일 복사가 곧 백업**입니다.
-- 권장: 작업 스케줄러로 일 1회 복사 (예: `robocopy C:\apps\reliability-app\data \\NAS\backup\reliability /R:1`)
+- 기본 데이터 경로는 `data\reliability.db`입니다 (`RELIABILITY_DB_PATH` 설정 시 해당 경로 사용).
+- 파일 복사 백업은 **앱 중지 → DB 파일 복사 → 앱 시작** 순서로 실행합니다. 쓰기 중인 파일만 복사하면 일관된 백업을 보장할 수 없습니다.
 - 복원: 앱 중지 → db 파일 교체 → 시작.
 
 ## 7. 업데이트 (코드 갱신)
@@ -73,6 +73,9 @@ Stop-ScheduledTask -TaskName "ReliabilityApp"
 cd C:\apps\reliability-app
 git pull
 .venv\Scripts\pip install -r requirements.txt   # 의존성 변경 시
+.venv\Scripts\python -m pip install -r requirements-dev.txt
+.venv\Scripts\python verify.py
+# 검증 성공을 확인한 뒤 시작
 Start-ScheduledTask -TaskName "ReliabilityApp"
 ```
 
