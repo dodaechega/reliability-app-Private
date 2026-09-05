@@ -38,6 +38,28 @@ def test_login_create_navigate_and_logout():
     assert "user" not in at.session_state
 
 
+def test_existing_user_login_preserves_identity_and_role():
+    before = db.list_users()
+    admin = next(u for u in before if u["login_id"] == "admin")
+    at = AppTest.from_file(APP, default_timeout=30).run()
+    at.selectbox[0].select(admin["id"])
+    button(at, "로그인").click().run()
+    assert not at.exception
+    assert at.session_state.user == admin
+    assert db.list_users() == before
+
+
+def test_duplicate_display_names_select_the_requested_account():
+    selected = db.get_or_create_user("관리자", login_id="qa-admin")
+    before = db.list_users()
+    at = AppTest.from_file(APP, default_timeout=30).run()
+    at.selectbox[0].select(selected["id"])
+    button(at, "로그인").click().run()
+    assert not at.exception
+    assert at.session_state.user == selected
+    assert db.list_users() == before
+
+
 def test_statistics_excludes_not_applicable_and_keeps_empty_models(model_id):
     items = db.get_model_items(model_id)[:4]
     for it in items:
