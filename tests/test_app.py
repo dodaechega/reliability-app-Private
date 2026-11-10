@@ -104,3 +104,32 @@ def test_rerun_reuses_export_and_refreshes_after_save(model_id, monkeypatch):
     assert not at.exception
     assert calls[-1] == "new saved specification"
     assert len(calls) == 2
+
+
+def test_model_stage_is_inherited_and_messages_survive_rerun(model_id):
+    from seed_data import DEV_STAGES, ITEM_STAGES
+
+    assert set(DEV_STAGES) <= set(ITEM_STAGES)
+    mid = db.create_model("OQC model", "", "스피커", "OQC", "QA", "", "", "QA")
+    assert {it["stage"] for it in db.get_model_items(mid)} == {"OQC"}
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.session_state.user = {"name": "QA", "role": "user"}
+    at.session_state.page = "모델 상세"
+    at.session_state.selected_model = mid
+    at.run()
+    button(at, "💾 저장").click().run()
+    assert not at.exception
+    assert [s.value for s in at.success] == ["8건 저장했습니다."]
+
+
+def test_model_delete_requires_confirmation(model_id):
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.session_state.user = {"name": "QA", "role": "user"}
+    at.session_state.page = "모델 상세"
+    at.session_state.selected_model = model_id
+    at.run()
+    assert button(at, "이 모델 삭제").disabled
+    at.checkbox[0].check().run()
+    button(at, "이 모델 삭제").click().run()
+    assert not at.exception
+    assert db.get_model(model_id) is None

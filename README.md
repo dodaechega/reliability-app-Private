@@ -9,16 +9,16 @@ Python 3.12 기준. 직접 의존성은 검증한 버전으로 고정합니다.
 ```bash
 # 최초 1회
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 
 # 실행
-.venv\Scripts\streamlit run app.py
+.venv\Scripts\python.exe -m streamlit run app.py
 ```
 브라우저에서 `http://localhost:8501` 접속.
 
 ## 사내 서버(같은 네트워크 공유) 실행
 ```bash
-.venv\Scripts\streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+.venv\Scripts\python.exe -m streamlit run app.py --server.address 0.0.0.0 --server.port 8501
 ```
 같은 사내망의 담당자는 `http://<서버IP>:8501` 로 접속.
 

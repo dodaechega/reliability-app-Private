@@ -21,13 +21,13 @@ cd reliability-app
 
 # 가상환경 + 의존성
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 ## 3. 실행 (사내망 공유)
 
 ```powershell
-.venv\Scripts\streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+.venv\Scripts\python.exe -m streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
 ```
 
 - 담당자 접속: `http://<서버IP>:8501`
@@ -75,7 +75,7 @@ New-NetFirewallRule -DisplayName "ReliabilityApp 8501" -Direction Inbound `
 Stop-ScheduledTask -TaskName "ReliabilityApp"
 cd C:\apps\reliability-app
 git pull
-.venv\Scripts\pip install -r requirements.txt   # 의존성 변경 시
+.venv\Scripts\python.exe -m pip install -r requirements.txt   # 의존성 변경 시
 .venv\Scripts\python -m pip install -r requirements-dev.txt
 .venv\Scripts\python verify.py
 # 검증 성공을 확인한 뒤 시작

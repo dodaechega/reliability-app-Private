@@ -56,6 +56,12 @@ TPL_LABELS = {
 }
 
 
+def flash(message):
+    """rerun 뒤에도 보이도록 완료 메시지를 다음 실행으로 넘긴다."""
+    st.session_state._flash = message
+    st.rerun()
+
+
 def goto(page):
     """버튼 등 위젯 생성 이후 시점에서 안전하게 페이지를 이동한다.
     라디오(key='page')는 위젯 생성 후 직접 수정할 수 없으므로,
@@ -136,7 +142,7 @@ def new_model_view():
         mid = db.create_model(name.strip(), code.strip(), product_group, dev_stage,
                               owner.strip(), start_date.strip(), end_date.strip(),
                               st.session_state.user["name"])
-        st.success(f"모델이 생성되었습니다. (ID {mid}) 상세 화면으로 이동합니다.")
+        st.session_state._flash = f"모델이 생성되었습니다. (ID {mid})"
         st.session_state.selected_model = mid
         goto("모델 상세")
 
@@ -171,8 +177,7 @@ def model_detail_view():
                     "owner": owner.strip(), "status": status, "dev_stage": stage,
                     "start_date": start_date.strip(), "end_date": end_date.strip(),
                 }, st.session_state.user["name"])
-                st.success("모델 정보를 저장했습니다.")
-                st.rerun()
+                flash("모델 정보를 저장했습니다.")
 
     # 시험항목 편집 표
     items = db.get_model_items(mid)
@@ -202,8 +207,7 @@ def model_detail_view():
     if c1.button("💾 저장", type="primary"):
         cleaned = clean_editor_records(edited, COL_LABELS, FIELDS)
         db.replace_model_items(mid, cleaned, st.session_state.user["name"])
-        st.success(f"{len(cleaned)}건 저장했습니다.")
-        st.rerun()
+        flash(f"{len(cleaned)}건 저장했습니다.")
 
     xlsx = cached_model_xlsx(model, items)
     c2.download_button("⬇ 엑셀 내보내기", data=xlsx,
@@ -212,7 +216,8 @@ def model_detail_view():
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     with st.expander("⚠ 모델 삭제"):
-        if st.button("이 모델 삭제", type="secondary"):
+        confirmed = st.checkbox("시험항목까지 모두 삭제되며 되돌릴 수 없음을 확인했습니다.", key=f"del_ok_{mid}")
+        if st.button("이 모델 삭제", type="secondary", disabled=not confirmed):
             db.delete_model(mid, st.session_state.user["name"])
             st.session_state.selected_model = None
             goto("대시보드")
@@ -271,8 +276,7 @@ def template_manage_view():
     if st.button("💾 템플릿 저장", type="primary"):
         cleaned = clean_editor_records(edited, TPL_LABELS, TPL_FIELDS)
         db.replace_template_items(pg, cleaned, st.session_state.user["name"])
-        st.success(f"'{pg}' 템플릿 {len(cleaned)}건을 저장했습니다.")
-        st.rerun()
+        flash(f"'{pg}' 템플릿 {len(cleaned)}건을 저장했습니다.")
 
 
 # ---------------- 변경이력 ----------------
@@ -369,6 +373,8 @@ def main():
                 st.session_state.pop(k, None)
             st.rerun()
 
+    if "_flash" in st.session_state:
+        st.success(st.session_state.pop("_flash"))
     if page == "대시보드":
         dashboard_view()
     elif page == "신규 모델 등록":
