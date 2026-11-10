@@ -5,7 +5,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 
-from seed_data import PRODUCT_GROUPS, TEMPLATE_ITEMS
+from seed_data import ITEM_STAGES, PRODUCT_GROUPS, TEMPLATE_ITEMS
 
 DB_PATH = os.environ.get("RELIABILITY_DB_PATH",
                          os.path.join(os.path.dirname(__file__), "data", "reliability.db"))
@@ -223,8 +223,8 @@ def create_model(name, code, product_group, dev_stage, owner, start_date, end_da
             "SELECT * FROM template_items WHERE product_group = ? ORDER BY seq, id",
             (product_group,),
         ).fetchall()
-        # State 기본값: 모델 개발단계가 PV/PR/SR/MP 중 하나면 그대로 물려받음
-        stage = dev_stage if dev_stage in ("PV", "PR", "SR", "MP") else None
+        # State 기본값: 모델 개발단계를 그대로 물려받음
+        stage = dev_stage if dev_stage in ITEM_STAGES else None
         for t in templates:
             # available(수행가능 여부)로 적용여부 기본값 결정
             applicable = "N" if (t["available"] or "").strip().lower() == "can't" else "Y"

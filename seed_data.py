@@ -199,10 +199,10 @@ TEMPLATE_ITEMS = {
 }
 
 # 개발 단계 옵션 (모델 단위)
-DEV_STAGES = ["PR", "SR", "MP", "OQC"]
+DEV_STAGES = ["PV", "PR", "SR", "MP", "OQC"]
 
 # 시험항목별 State 옵션 (항목 단위 드롭다운)
-ITEM_STAGES = ["PV", "PR", "SR", "MP"]
+ITEM_STAGES = DEV_STAGES  # 모델 단계와 같은 목록을 써서 어긋나지 않게 한다
 
 # 진행 상태 옵션
 PROGRESS_STATES = ["계획", "진행", "완료", "보류", "해당없음"]
